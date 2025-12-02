@@ -13,8 +13,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK(role IN ('admin', 'student'))
+            password_hash TEXT NOT NULL
         )
     ''')
     
@@ -30,13 +29,13 @@ def init_db():
     conn.commit()
     conn.close()
 
-def add_user(username, password_hash, role):
+def add_user(username, password_hash):
     """Ajoute un nouvel utilisateur."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", 
-                       (username, password_hash, role))
+        cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+                       (username, password_hash))
         conn.commit()
         conn.close()
         return True
@@ -47,7 +46,7 @@ def get_user(username):
     """Récupère un utilisateur par son nom d'utilisateur."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, password_hash, role FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT id, username, password_hash FROM users WHERE username = ?", (username,))
     user = cursor.fetchone()
     conn.close()
     return user

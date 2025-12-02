@@ -14,20 +14,19 @@ def login_user(username, password):
     """Authentifie un utilisateur."""
     user = get_user(username)
     if user:
-        # user = (id, username, password_hash, role)
+        # user = (id, username, password_hash)
         if check_password(password, user[2]):
             st.session_state.user = {
                 "id": user[0],
-                "username": user[1],
-                "role": user[3]
+                "username": user[1]
             }
             return True
     return False
 
-def register_user(username, password, role):
+def register_user(username, password):
     """Enregistre un nouvel utilisateur."""
     hashed = hash_password(password)
-    return add_user(username, hashed, role)
+    return add_user(username, hashed)
 
 def logout_user():
     """Déconnecte l'utilisateur."""

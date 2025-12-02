@@ -33,12 +33,11 @@ if "user" not in st.session_state:
         with st.form("register_form"):
             new_user = st.text_input("Nom d'utilisateur")
             new_pass = st.text_input("Mot de passe", type="password")
-            role = st.selectbox("Rôle", ["student", "admin"])
             submit_reg = st.form_submit_button("S'inscrire")
             
             if submit_reg:
                 if new_user and new_pass:
-                    if register_user(new_user, new_pass, role):
+                    if register_user(new_user, new_pass):
                         st.success("Compte créé ! Vous pouvez vous connecter.")
                     else:
                         st.error("Ce nom d'utilisateur est déjà pris.")
@@ -54,30 +53,17 @@ modules = get_all_modules()
 # --- Sidebar ---
 with st.sidebar:
     st.title("🎓 UniPrep AI")
-    st.write(f"Bonjour, **{user['username']}** ({user['role']})")
+    st.write(f"Bonjour, **{user['username']}**")
     
     if st.button("Se déconnecter"):
         logout_user()
     
     st.divider()
     
-    if modules:
-        selected_module = st.selectbox("Choisir un module :", modules)
-    else:
-        selected_module = None
-        st.warning("Aucun module disponible.")
-
-# --- Interface ADMIN ---
-if user['role'] == "admin":
-    st.header(f"⚙️ Administration")
-    
-    if selected_module:
-        st.subheader(f"Module actif : {selected_module}")
-    
     # Création de nouveau module
-    with st.expander("Ajouter un nouveau module"):
+    with st.expander("Ajouter un module"):
         new_module = st.text_input("Nom du module")
-        if st.button("Ajouter Module"):
+        if st.button("Créer"):
             if new_module:
                 if add_module(new_module):
                     st.success(f"Module {new_module} ajouté !")
@@ -85,8 +71,20 @@ if user['role'] == "admin":
                 else:
                     st.error("Ce module existe déjà.")
     
-    if selected_module:
-        st.subheader("Importer des cours (PDF)")
+    st.divider()
+
+    if modules:
+        selected_module = st.selectbox("Choisir un module :", modules)
+    else:
+        selected_module = None
+        st.warning("Aucun module disponible. Créez-en un !")
+
+# --- Interface Principale ---
+if selected_module:
+    st.header(f"📚 Module : {selected_module}")
+    
+    # Section Upload (disponible pour tous)
+    with st.expander("Importer des cours (PDF)"):
         uploaded_file = st.file_uploader("Choisissez un fichier PDF", type="pdf")
         
         if uploaded_file is not None:
@@ -96,46 +94,43 @@ if user['role'] == "admin":
                     if success:
                         st.success("Document indexé avec succès ! L'IA est prête.")
 
-# --- Interface ÉTUDIANT ---
+    st.divider()
+    st.caption("Posez vos questions sur les cours de ce module.")
+
+    # Gestion de l'historique du chat
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Afficher les messages précédents
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Zone de saisie utilisateur
+    if prompt := st.chat_input("Posez votre question..."):
+        # Afficher la question utilisateur
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Générer la réponse
+        with st.chat_message("assistant"):
+            with st.spinner("Recherche dans le cours..."):
+                try:
+                    qa_chain = get_qa_chain(selected_module)
+                    response = qa_chain.invoke({"query": prompt})
+                    answer = response['result']
+                    
+                    st.markdown(answer)
+                    
+                    # Optionnel : Afficher les sources
+                    with st.expander("Voir les sources utilisées"):
+                        for doc in response['source_documents']:
+                            st.caption(f"Source: {doc.metadata['source']}")
+                            st.text(doc.page_content[:200] + "...")
+
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
 else:
-    if selected_module:
-        st.header(f"📚 Révision : {selected_module}")
-        st.caption("L'IA répondra uniquement en se basant sur les cours de ce module.")
-
-        # Gestion de l'historique du chat
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
-
-        # Afficher les messages précédents
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        # Zone de saisie utilisateur
-        if prompt := st.chat_input("Posez votre question sur ce cours..."):
-            # Afficher la question utilisateur
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
-            # Générer la réponse
-            with st.chat_message("assistant"):
-                with st.spinner("Recherche dans le cours..."):
-                    try:
-                        qa_chain = get_qa_chain(selected_module)
-                        response = qa_chain.invoke({"query": prompt})
-                        answer = response['result']
-                        
-                        st.markdown(answer)
-                        
-                        # Optionnel : Afficher les sources
-                        with st.expander("Voir les sources utilisées"):
-                            for doc in response['source_documents']:
-                                st.caption(f"Source: {doc.metadata['source']}")
-                                st.text(doc.page_content[:200] + "...")
-
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
-                    except Exception as e:
-                        st.error(f"Erreur : {e}")
-    else:
-        st.info("Veuillez sélectionner un module pour commencer à réviser.")
+    st.info("Veuillez sélectionner ou créer un module pour commencer.")
